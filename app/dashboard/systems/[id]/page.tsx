@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, Loader2, Search } from 'lucide-react'
 import { toast } from 'sonner'
+import EvidenceSection from './components/EvidenceSection'
 
 interface Requirement {
   mapping_id: string
@@ -349,6 +350,9 @@ export default function SystemDetailsPage() {
                           </div>
                         </div>
                       )}
+                      
+                      {/* Evidence Section */}
+                      <EvidenceSection mappingId={req.mapping_id} />
                     </div>
                     
                     <div className="flex flex-col gap-2 min-w-[140px]">
