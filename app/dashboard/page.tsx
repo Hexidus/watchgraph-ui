@@ -1,227 +1,201 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-
-interface AISystem {
-  id: string
-  name: string
-  description: string
-  risk_category: string
-  organization: string
-  department: string
-  owner_email: string
-  created_at: string
-  updated_at: string
-}
-
-interface ComplianceData {
-  system_id: string
-  system_name: string
-  risk_category: string
-  total_requirements: number
-  compliance_percentage: number
-  status_breakdown: {
-    not_started: number
-    in_progress: number
-    completed: number
-    non_compliant: number
-  }
-}
+import { useEffect, useState } from 'react';
+import { getDashboardStats, getAISystems } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DashboardPage() {
-  const [systems, setSystems] = useState<AISystem[]>([])
-  const [complianceData, setComplianceData] = useState<{ [key: string]: ComplianceData }>({})
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuth();
+  const [stats, setStats] = useState({
+    total_systems: 0,
+    total_requirements: 0,
+    completed_requirements: 0,
+    overall_compliance: 0,
+  });
+  const [systems, setSystems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchSystems()
-  }, [])
-
-  const fetchSystems = async () => {
-    try {
-      // Fetch all AI systems
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/systems`)
-      const data = await response.json()
-      setSystems(data)
-
-      // Fetch compliance data for each system
-      const compliancePromises = data.map(async (system: AISystem) => {
-        const compResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/systems/${system.id}/compliance`)
-        const compData = await compResponse.json()
-        return { [system.id]: compData }
-      })
-
-      const complianceResults = await Promise.all(compliancePromises)
-      const complianceMap = Object.assign({}, ...complianceResults)
-      setComplianceData(complianceMap)
+    async function loadData() {
+      if (!user || loading) return;
       
-      setLoading(false)
-    } catch (error) {
-      console.error('Error fetching data:', error)
-      setLoading(false)
+      try {
+        setIsLoading(true);
+        const [dashboardStats, aiSystems] = await Promise.all([
+          getDashboardStats(),
+          getAISystems()
+        ]);
+        
+        setStats(dashboardStats);
+        setSystems(aiSystems);
+      } catch (err: any) {
+        console.error('Failed to load dashboard data:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }
 
-  const getRiskBadgeColor = (risk: string) => {
-    switch (risk.toLowerCase()) {
-      case 'high': return 'destructive'
-      case 'limited': return 'default'
-      case 'minimal': return 'secondary'
-      case 'unacceptable': return 'destructive'
-      default: return 'default'
-    }
-  }
+    loadData();
+  }, [user, loading]);
 
-  const getComplianceColor = (percentage: number) => {
-    if (percentage >= 80) return 'text-green-600'
-    if (percentage >= 50) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="text-2xl font-semibold mb-2">Loading...</div>
-          <div className="text-muted-foreground">Fetching your AI systems</div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  const totalSystems = systems.length
-  const totalRequirements = Object.values(complianceData).reduce((sum, data) => sum + data.total_requirements, 0)
-  const overallCompliance = totalRequirements > 0
-    ? Object.values(complianceData).reduce((sum, data) => sum + (data.compliance_percentage * data.total_requirements), 0) / totalRequirements
-    : 0
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <p className="text-red-600 font-medium">Error: {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">WatchGraph</h1>
-              <p className="text-muted-foreground">Continuous AI Compliance Monitoring</p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">WatchGraph</h1>
+            <p className="text-gray-600 mt-1">Continuous AI Compliance Monitoring</p>
+          </div>
+          <button className="px-6 py-3 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition shadow-sm">
+            + Add System
+          </button>
+        </div>
+
+        {/* Stats Cards - 4 Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Total Systems */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                Total Systems
+              </h3>
             </div>
-            <Button onClick={() => window.location.href = '/dashboard/add-system'}>
-              + Add System
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Systems</CardDescription>
-              <CardTitle className="text-4xl">{totalSystems}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Being monitored</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Requirements</CardDescription>
-              <CardTitle className="text-4xl">{totalRequirements}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Being tracked</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Overall Compliance</CardDescription>
-              <CardTitle className={`text-4xl ${getComplianceColor(overallCompliance)}`}>
-                {overallCompliance.toFixed(1)}%
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Across all systems</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Systems List */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Your AI Systems</h2>
+            <p className="text-4xl font-bold text-gray-900 mb-2">
+              {stats.total_systems}
+            </p>
+            <p className="text-sm text-gray-500">Being monitored</p>
           </div>
 
+          {/* Total Requirements */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                Total Requirements
+              </h3>
+            </div>
+            <p className="text-4xl font-bold text-gray-900 mb-2">
+              {stats.total_requirements}
+            </p>
+            <p className="text-sm text-gray-500">Being tracked</p>
+          </div>
+
+          {/* Completed Requirements - NEW CARD */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                Completed
+              </h3>
+            </div>
+            <p className="text-4xl font-bold text-green-600 mb-2">
+              {stats.completed_requirements}
+            </p>
+            <p className="text-sm text-gray-500">Requirements met</p>
+          </div>
+
+          {/* Overall Compliance */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                Overall Compliance
+              </h3>
+            </div>
+            <p className={`text-4xl font-bold mb-2 ${
+              stats.overall_compliance >= 80 ? 'text-green-600' : 
+              stats.overall_compliance >= 50 ? 'text-yellow-600' : 
+              'text-red-600'
+            }`}>
+              {stats.overall_compliance}%
+            </p>
+            <p className="text-sm text-gray-500">Across all systems</p>
+          </div>
+        </div>
+
+        {/* AI Systems List */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-100">
+            <h2 className="text-xl font-bold text-gray-900">Your AI Systems</h2>
+          </div>
+          
           {systems.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground mb-4">No AI systems registered yet</p>
-                <Button onClick={() => window.location.href = '/dashboard/add-system'}>
-                  Register Your First System
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="p-12 text-center">
+              <div className="max-w-sm mx-auto">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">No AI systems registered yet</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  Get started by registering your first AI system for compliance monitoring.
+                </p>
+                <button className="mt-6 px-6 py-3 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition">
+                  + Register Your First System
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {systems.map((system) => {
-                const compliance = complianceData[system.id]
-                return (
-                  <Card key={system.id} className="hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => window.location.href = `/dashboard/systems/${system.id}`}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-xl mb-2">{system.name}</CardTitle>
-                          <CardDescription className="line-clamp-2">{system.description}</CardDescription>
-                        </div>
-                        <Badge variant={getRiskBadgeColor(system.risk_category)}>
-                          {system.risk_category.toUpperCase()}
-                        </Badge>
+            <div className="divide-y divide-gray-100">
+              {systems.map((system: any) => (
+                <div key={system.id} className="p-6 hover:bg-gray-50 transition cursor-pointer">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {system.name}
+                        </h3>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          system.risk_category === 'HIGH' ? 'bg-red-100 text-red-800' :
+                          system.risk_category === 'LIMITED' ? 'bg-yellow-100 text-yellow-800' :
+                          system.risk_category === 'MINIMAL' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {system.risk_category}
+                        </span>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm text-muted-foreground">
-                            {system.organization} • {system.department}
-                          </p>
-                          {compliance && (
-                            <p className="text-sm">
-                              {compliance.status_breakdown.completed} of {compliance.total_requirements} requirements complete
-                            </p>
-                          )}
-                        </div>
-                        {compliance && (
-                          <div className="text-right">
-                            <div className={`text-2xl font-bold ${getComplianceColor(compliance.compliance_percentage)}`}>
-                              {compliance.compliance_percentage.toFixed(1)}%
-                            </div>
-                            <p className="text-xs text-muted-foreground">Compliant</p>
-                          </div>
-                        )}
-                      </div>
-                      {compliance && (
-                        <div className="mt-4 w-full bg-secondary rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full transition-all"
-                            style={{ width: `${compliance.compliance_percentage}%` }}
-                          />
-                        </div>
+                      <p className="text-sm text-gray-600 mt-2">
+                        {system.description || 'No description provided'}
+                      </p>
+                      {system.organization && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          {system.organization} {system.department && `• ${system.department}`}
+                        </p>
                       )}
-                    </CardContent>
-                  </Card>
-                )
-              })}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
-      </main>
+      </div>
     </div>
-  )
+  );
 }
