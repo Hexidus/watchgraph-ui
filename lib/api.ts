@@ -5,15 +5,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 async function getAuthHeaders() {
   try {
     const session = await fetchAuthSession();
-    console.log('Auth session:', session);
-    console.log('Tokens:', session.tokens);
-    
     const token = session.tokens?.accessToken?.toString();
-    console.log('Access token exists:', !!token);
-    
-    if (!token) {
-      console.warn('No access token found in session');
-    }
     
     return {
       'Content-Type': 'application/json',
@@ -29,7 +21,6 @@ async function getAuthHeaders() {
 
 export async function getDashboardStats() {
   const headers = await getAuthHeaders();
-  console.log('Request headers:', headers);
   
   const response = await fetch(`${API_URL}/api/dashboard/stats`, {
     headers
@@ -44,7 +35,6 @@ export async function getDashboardStats() {
 
 export async function getAISystems() {
   const headers = await getAuthHeaders();
-  console.log('Request headers:', headers);
   
   const response = await fetch(`${API_URL}/api/systems`, {
     headers
@@ -56,3 +46,74 @@ export async function getAISystems() {
   
   return response.json();
 }
+
+export async function getSystemCompliance(systemId: string) {
+  const headers = await getAuthHeaders();
+  
+  const response = await fetch(`${API_URL}/api/systems/${systemId}/compliance`, {
+    headers
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch system compliance');
+  }
+  
+  return response.json();
+}
+
+export async function createAISystem(data: {
+  name: string;
+  description?: string;
+  risk_category: string;
+  organization?: string;
+  department?: string;
+  owner_email?: string;
+}) {
+  const headers = await getAuthHeaders();
+  
+  const response = await fetch(`${API_URL}/api/systems`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to create AI system');
+  }
+  
+  return response.json();
+}
+
+export async function getSystemRequirements(systemId: string) {
+  const headers = await getAuthHeaders();
+  
+  const response = await fetch(`${API_URL}/api/systems/${systemId}/requirements`, {
+    headers
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch system requirements');
+  }
+  
+  return response.json();
+}
+
+export async function updateRequirementStatus(mappingId: string, data: {
+  status: string;
+  notes?: string;
+}) {
+  const headers = await getAuthHeaders();
+  
+  const response = await fetch(`${API_URL}/api/requirements/${mappingId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(data)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to update requirement status');
+  }
+  
+  return response.json();
+}
+

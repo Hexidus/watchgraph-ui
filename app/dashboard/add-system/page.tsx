@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { createAISystem } from '@/lib/api'
 
 export default function AddSystemPage() {
   const router = useRouter()
@@ -25,7 +26,6 @@ export default function AddSystemPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validation
     if (!formData.name.trim()) {
       toast.error('System name is required')
       return
@@ -39,21 +39,12 @@ export default function AddSystemPage() {
     setSubmitting(true)
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/systems`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
-
-      if (!response.ok) throw new Error('Failed to create system')
-
-      const newSystem = await response.json()
+      const newSystem = await createAISystem(formData)
 
       toast.success('System created successfully!', {
         description: `${formData.name} has been added`
       })
 
-      // Redirect to the new system's details page
       router.push(`/dashboard/systems/${newSystem.id}`)
     } catch (error) {
       console.error('Error creating system:', error)
@@ -89,7 +80,6 @@ export default function AddSystemPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* System Name */}
               <div className="space-y-2">
                 <Label htmlFor="name">
                   System Name <span className="text-red-500">*</span>
@@ -103,7 +93,6 @@ export default function AddSystemPage() {
                 />
               </div>
 
-              {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -115,7 +104,6 @@ export default function AddSystemPage() {
                 />
               </div>
 
-              {/* Risk Category */}
               <div className="space-y-2">
                 <Label htmlFor="risk_category">
                   EU AI Act Risk Category <span className="text-red-500">*</span>
@@ -137,7 +125,6 @@ export default function AddSystemPage() {
                 </p>
               </div>
 
-              {/* Organization */}
               <div className="space-y-2">
                 <Label htmlFor="organization">
                   Organization <span className="text-red-500">*</span>
@@ -151,7 +138,6 @@ export default function AddSystemPage() {
                 />
               </div>
 
-              {/* Department */}
               <div className="space-y-2">
                 <Label htmlFor="department">Department</Label>
                 <Input
@@ -162,7 +148,6 @@ export default function AddSystemPage() {
                 />
               </div>
 
-              {/* Owner Email */}
               <div className="space-y-2">
                 <Label htmlFor="owner_email">System Owner Email</Label>
                 <Input
@@ -174,7 +159,6 @@ export default function AddSystemPage() {
                 />
               </div>
 
-              {/* Submit Buttons */}
               <div className="flex gap-3 pt-4">
                 <Button
                   type="button"
