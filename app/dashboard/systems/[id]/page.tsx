@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { ArrowLeft, Loader2, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import EvidenceSection from './components/EvidenceSection'
+import { getAISystem, getSystemRequirements, getSystemCompliance, updateRequirementStatus as apiUpdateRequirementStatus } from '@/lib/api'
 
 interface Requirement {
   mapping_id: string
@@ -61,21 +62,15 @@ export default function SystemDetailsPage() {
 
   const fetchData = async () => {
     try {
-      const systemRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/systems/${systemId}`)
-      if (!systemRes.ok) throw new Error('Failed to fetch system')
-      const systemData = await systemRes.json()
+      const [systemData, reqData, compData] = await Promise.all([
+        getAISystem(systemId),
+        getSystemRequirements(systemId),
+        getSystemCompliance(systemId)
+      ])
+      
       setSystem(systemData)
-
-      const reqRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/systems/${systemId}/requirements`)
-      if (!reqRes.ok) throw new Error('Failed to fetch requirements')
-      const reqData = await reqRes.json()
       setRequirements(reqData)
-
-      const compRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/systems/${systemId}/compliance`)
-      if (!compRes.ok) throw new Error('Failed to fetch compliance')
-      const compData = await compRes.json()
       setCompliance(compData)
-
       setLoading(false)
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -111,16 +106,10 @@ export default function SystemDetailsPage() {
     setUpdatingId(mappingId)
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/requirements/${mappingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          status: newStatus,
-          updated_by: system?.owner_email || 'user@example.com'
-        })
+      await apiUpdateRequirementStatus(mappingId, { 
+        status: newStatus,
+        notes: undefined
       })
-
-      if (!response.ok) throw new Error('Failed to update requirement')
       
       const statusMessages = {
         completed: '✓ Marked as complete',
