@@ -86,3 +86,26 @@ export async function updateRequirementStatus(mappingId: string, data: {
   return response.json();
 }
 
+// Framework and Activity Feed APIs
+
+export async function getFrameworks() {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/api/frameworks`, { headers });
+  if (!response.ok) throw new Error('Failed to fetch frameworks');
+  return response.json();
+}
+
+export async function getComplianceByFramework() {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/api/compliance/by-framework`, { headers });
+  if (!response.ok) throw new Error('Failed to fetch compliance by framework');
+  return response.json();
+}
+
+export async function getActivityFeed(limit: number = 10) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/api/compliance/activity-feed?limit=${limit}`, { headers });
+  if (!response.ok) throw new Error('Failed to fetch activity feed');
+  return response.json();
+}
+
