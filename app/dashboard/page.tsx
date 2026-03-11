@@ -100,18 +100,35 @@ export default function DashboardPage() {
       try {
         setIsLoading(true);
         
-        const [dashboardStats, aiSystems, frameworksData, complianceData, activityData] = await Promise.all([
+        // Fetch core data first
+        const [dashboardStats, aiSystems] = await Promise.all([
           getDashboardStats(),
-          getAISystems(),
-          getFrameworks(),
-          getComplianceByFramework(),
-          getActivityFeed(10)
+          getAISystems()
         ]);
         
         setStats(dashboardStats);
-        setFrameworks(frameworksData);
-        setFrameworkCompliance(complianceData);
-        setActivityFeed(activityData.events || []);
+        
+        // Fetch optional data - don't fail if these error
+        try {
+          const frameworksData = await getFrameworks();
+          setFrameworks(frameworksData);
+        } catch (e) {
+          console.warn('Failed to load frameworks:', e);
+        }
+        
+        try {
+          const complianceData = await getComplianceByFramework();
+          setFrameworkCompliance(complianceData);
+        } catch (e) {
+          console.warn('Failed to load compliance by framework:', e);
+        }
+        
+        try {
+          const activityData = await getActivityFeed(10);
+          setActivityFeed(activityData.events || []);
+        } catch (e) {
+          console.warn('Failed to load activity feed:', e);
+        }
         
         // Fetch compliance data for each system
         const systemsWithCompliance = await Promise.all(
@@ -177,11 +194,19 @@ export default function DashboardPage() {
     const total = frameworkCompliance.frameworks.reduce((sum, fw) => sum + fw.total_requirements, 0);
     let currentAngle = -90;
 
+    if (frameworkCompliance.frameworks.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-48">
+          <p className="text-gray-500 text-sm">No framework data available</p>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center">
         <div className="relative">
           <svg width={size} height={size} className="transform -rotate-90">
-            {frameworkCompliance.frameworks.map((fw, index) => {
+            {frameworkCompliance.frameworks.map((fw) => {
               const percentage = total > 0 ? (fw.total_requirements / total) * 100 : 0;
               const strokeDasharray = (percentage / 100) * circumference;
               const rotation = currentAngle;
@@ -481,37 +506,39 @@ export default function DashboardPage() {
         </div>
 
         {/* Framework Selector Tabs */}
-        <div className="flex items-center gap-2 mb-8 flex-wrap">
-          <button
-            onClick={() => setSelectedFramework(null)}
-            className={`px-4 py-2 rounded-full font-medium text-sm transition ${
-              selectedFramework === null
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-            }`}
-          >
-            All Frameworks
-            <span className="ml-2 px-2 py-0.5 rounded-full bg-white/20 text-xs">
-              {totalFrameworkRequirements}
-            </span>
-          </button>
-          {frameworks.map((fw) => (
+        {frameworks.length > 0 && (
+          <div className="flex items-center gap-2 mb-8 flex-wrap">
             <button
-              key={fw.id}
-              onClick={() => setSelectedFramework(fw.id)}
+              onClick={() => setSelectedFramework(null)}
               className={`px-4 py-2 rounded-full font-medium text-sm transition ${
-                selectedFramework === fw.id
+                selectedFramework === null
                   ? 'bg-gray-900 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
               }`}
             >
-              {fw.name}
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-gray-100 text-xs">
-                {fw.requirement_count}
+              All Frameworks
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-white/20 text-xs">
+                {totalFrameworkRequirements}
               </span>
             </button>
-          ))}
-        </div>
+            {frameworks.map((fw) => (
+              <button
+                key={fw.id}
+                onClick={() => setSelectedFramework(fw.id)}
+                className={`px-4 py-2 rounded-full font-medium text-sm transition ${
+                  selectedFramework === fw.id
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                {fw.name}
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-gray-100 text-xs">
+                  {fw.requirement_count}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -532,7 +559,7 @@ export default function DashboardPage() {
             <p className="text-4xl font-bold text-gray-900 mb-2">
               {stats.total_requirements}
             </p>
-            <p className="text-sm text-gray-500">Across {frameworks.length} frameworks</p>
+            <p className="text-sm text-gray-500">Across {frameworks.length || 3} frameworks</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition">
